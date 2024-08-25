@@ -79,6 +79,14 @@ class MCSU extends EventEmitter {
       const type = infoArr[1].split("/")[1];
 
       if(message.includes("For help, type \"help\"")) this.emit("ready");
+      if(message.endsWith("joined the game")) this.emit("join", message.split(" ")[0]);
+      if(message.endsWith("left the game")) this.emit("leave", message.split(" ")[0]);
+      if(message.startsWith("<")) {
+        let lastInd = message.indexOf(">");
+        let author = message.slice(1, lastInd);
+        let msg = message.slice(lastInd).trim();
+        this.emit("message", author, msg);
+      }
       this.emit("log", { type, time, from: infoArr[2] ?? "", message: message.trim() });
     });
   }

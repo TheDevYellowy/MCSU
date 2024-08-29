@@ -28,7 +28,6 @@ class MCSU extends EventEmitter {
     this.pid = undefined;
 
     this.regex = {
-      log: /^\[(\w{0,}\s\d{2}:\d{2}:\d{2}.\d{3})]\s\[(.*)\/(INFO|WARN|ERROR|FATAL)]\s\[(.*)\/]:\s(.*)$/,
       leave: /^(.*)\sleft\sthe\sgame$/,
       join: /^(.*)\sjoined\sthe\sgame$/,
     }
@@ -98,8 +97,9 @@ class MCSU extends EventEmitter {
 
   ondata(data) {
     data = data.toString();
-    if(!this.regex.log.test(data)) return;
-    const [log, time, thread, type, from, message] = this.regex.log.exec(data);
+    const logRegex = /^\[(\w{0,}\s\d{2}:\d{2}:\d{2}.\d{3})]\s\[(.*)\/(INFO|WARN|ERROR|FATAL)]\s\[(.*)\/]:\s(.*)$/;
+    if(!logRegex.test(data)) return;
+    const [log, time, thread, type, from, message] = logRegex.exec(data);
 
     if(message.includes("For help, type \"help\"")) {
       this.ready = true;

@@ -28,6 +28,7 @@ class MCSU extends EventEmitter {
     this.pid = undefined;
 
     this.regex = {
+      log: /^\[(\w{0,}\s\d{2}:\d{2}:\d{2}.\d{3})]\s\[(.*)\/(INFO|WARN|ERROR|FATAL)]\s\[(.*)\/]:\s(.*)$/,
       leave: /^(.*)\sleft\sthe\sgame$/,
       join: /^(.*)\sjoined\sthe\sgame$/,
     }
@@ -77,7 +78,7 @@ class MCSU extends EventEmitter {
       });
     }
 
-    this.spawn.stdin.setEncoding("uft8");
+    this.spawn.stdin.setEncoding("utf8");
 
     if(this.pipe) {
       process.stdin.pipe(this.spawn.stdin);
@@ -96,11 +97,9 @@ class MCSU extends EventEmitter {
   }
 
   ondata(data) {
-    const [info, message] = data.toString().split(":");
-    const infoArr = info.split("] [");
-    const timeStr = infoArr[0].substring(1);
-    const time = new Date(timeStr);
-    const type = infoArr[1].split("/")[1];
+    data = data.toString();
+    if(!this.regex.log.test(data)) return;
+    const [log, time, thread, type, from, message] = this.regex.log.exec(data);
 
     if(message.includes("For help, type \"help\"")) {
       this.ready = true;
@@ -126,7 +125,8 @@ class MCSU extends EventEmitter {
       let msg = message.slice(lastInd).trim();
       this.emit("message", author, msg);
     }
-    this.emit("log", { type, time, from: infoArr[2] ?? "", message: message.trim() });
+    this.emit("raw", log)
+    this.emit("log", { time: new Date(time), thread, type, from, message: message.trim() });
   }
 
   runCommand(command) {

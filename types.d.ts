@@ -7,7 +7,8 @@ interface Events {
   "join": [username: string];
   "leave": [username: string];
   "message": [author: string, message: string];
-  "log": [type: string, time: Date, from: string, message: string]
+  "raw": [log: string]
+  "log": [data: {time: Date, thread: string, type: string, from: string, message: string}]
 }
 
 interface properties {

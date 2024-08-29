@@ -2,7 +2,6 @@ const { EventEmitter } = require("node:events");
 const { spawn } = require("child_process");
 const fs = require("fs");
 
-/** @type {MSCU} */
 class MCSU extends EventEmitter {
   /**
    * @param {MSCUOptions} options
@@ -23,6 +22,16 @@ class MCSU extends EventEmitter {
     this.spawn = null;
     /** @type {boolean} @private */
     this.pipe = options.pipe ?? false;
+
+    this.regex = {
+      leave: /^(.*)\sleft\sthe\sgame$/,
+      join: /^(.*)\sjoined\sthe\sgame$/,
+    }
+
+    /** @type {Map<string, Date | "now">} @readonly */
+    this.lastOnline = new Map();
+    /** @type {string[]} @readonly */
+    this.online = [];
 
     if(options.startScript) {
       /** @readonly */
@@ -50,18 +59,18 @@ class MCSU extends EventEmitter {
         this.spawn = spawn("bash", [this.scriptName], {
           cwd: this.mcPath,
           stdio: "pipe"
-        })
+        });
       } else {
         this.spawn = spawn("cmd.exe", ['/c', this.scriptName], {
           cwd: this.mcPath,
           stdio: "pipe"
-        })
+        });
       }
     } else {
       this.spawn = spawn("java", [...this.flags, '-jar', this.jarName, this.nogui ? "nogui" : ""], {
         cwd: this.mcPath,
         stdio: "pipe"
-      })
+      });
     }
 
     this.spawn.stdin.setEncoding("uft8");
@@ -71,24 +80,44 @@ class MCSU extends EventEmitter {
       this.spawn.stdout.pipe(process.stdout);
     }
 
-    this.spawn.stdout.on("data", (data) => {
-      const [info, message] = data.toString().split(":");
-      const infoArr = info.split("] [");
-      const timeStr = infoArr[0].substring(1);
-      const time = new Date(timeStr);
-      const type = infoArr[1].split("/")[1];
+    this.spawn.stdout.on("data", this.ondata);
+    this.spawn.once("close", () => {
+      this.spawn.removeAllListeners();
+      this.spawn.stdin.removeAllListeners();
+      this.spawn.stdout.removeAllListeners();
 
-      if(message.includes("For help, type \"help\"")) this.emit("ready");
-      if(message.endsWith("joined the game")) this.emit("join", message.split(" ")[0]);
-      if(message.endsWith("left the game")) this.emit("leave", message.split(" ")[0]);
-      if(message.startsWith("<")) {
-        let lastInd = message.indexOf(">");
-        let author = message.slice(1, lastInd);
-        let msg = message.slice(lastInd).trim();
-        this.emit("message", author, msg);
-      }
-      this.emit("log", { type, time, from: infoArr[2] ?? "", message: message.trim() });
     });
+  }
+
+  ondata(data) {
+    const [info, message] = data.toString().split(":");
+    const infoArr = info.split("] [");
+    const timeStr = infoArr[0].substring(1);
+    const time = new Date(timeStr);
+    const type = infoArr[1].split("/")[1];
+
+    if(message.includes("For help, type \"help\"")) this.emit("ready");
+    if(this.regex.join.test(message)) {
+      const username = message.split(" ")[0];
+      this.lastOnline.set(username, "now");
+      this.online.push(username);
+
+      this.emit("join", username);
+    }
+    if(this.regex.leave.test(message)) {
+      const username = message.split(" ")[0];
+      this.lastOnline.set(username, new Date());
+      if(this.online.indexOf(username) >= 0) this.online.splice(this.online.indexOf(username))
+
+      this.emit("leave", username);
+    }
+    if(message.startsWith("<")) {
+      let lastInd = message.indexOf(">");
+      let author = message.slice(1, lastInd);
+      let msg = message.slice(lastInd).trim();
+      this.emit("message", author, msg);
+    }
+    this.emit("log", { type, time, from: infoArr[2] ?? "", message: message.trim() });
   }
 
   runCommand(command) {
@@ -104,9 +133,9 @@ module.exports = MCSU;
  * @typedef MSCUOptions
  * @property {string | undefined} startScript The name of the script you are using to start mc if you are using one
  * @property {string | undefined} serverJar The name of the jar file for the server
- * @property {string[] | undefined} flags The server flags
- * @property {boolean | undefined} nogui Disable the gui ( this is true by default )
- * @property {boolean | undefined} pipe Pipe the console input and output to minecraft's input and output
+ * @property {string[] | undefined} [flags = []] The server flags
+ * @property {boolean | undefined} [nogui = true] Disable the gui ( this is true by default )
+ * @property {boolean | undefined} [pipe = false] Pipe the console input and output to minecraft's input and output
  * @property {string} mcPath The absolute path to the minecraft folder
  * @property {boolean} restart Automatically restart the server
  * @property {boolean} autostart Automatically start the server on script load

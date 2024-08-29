@@ -25,6 +25,7 @@ export interface MSCUOptions {
   serverJar?: string;
   flags?: string[];
   nogui?: boolean;
+  pipe?: boolean;
   mcPath: string;
   restart: boolean;
   autostart: boolean;
@@ -32,15 +33,25 @@ export interface MSCUOptions {
 
 export class MCSU extends EventEmitter {
   constructor(options: MSCUOptions);
+  public readonly pid: number | undefined;
   public readonly usingScript: boolean;
   public readonly scriptName?: string;
   public readonly jarName?: string;
+  public readonly online: string[];
+  public readonly ready: boolean;
+  private pipe: boolean;
   public options: MSCUOptions;
   public mcPath: MSCUOptions["mcPath"];
   public nogui: MSCUOptions["nogui"];
   public flags: string[];
   public running: boolean;
-  public spawn: ChildProcessWithoutNullStreams?;
+  public spawn: ChildProcessWithoutNullStreams | undefined;
+  public regex: Record<string, RegExp>;
+  public lastOnline: Map<string, Date | "now">;
+
+  public startServer(): void;
+  public runCommand(command: string): boolean;
+  private ondata(data: Buffer): void;
 
   public on<K extends keyof Events>(
     event: K,

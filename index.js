@@ -22,6 +22,10 @@ class MCSU extends EventEmitter {
     this.spawn = null;
     /** @type {boolean} @private */
     this.pipe = options.pipe ?? false;
+    /** @type {boolean} @readonly */
+    this.ready = false;
+    /** @type {number | undefined} @readonly */
+    this.pid = undefined;
 
     this.regex = {
       leave: /^(.*)\sleft\sthe\sgame$/,
@@ -80,12 +84,14 @@ class MCSU extends EventEmitter {
       this.spawn.stdout.pipe(process.stdout);
     }
 
+    this.pid = this.spawn.pid;
     this.spawn.stdout.on("data", this.ondata);
     this.spawn.once("close", () => {
       this.spawn.removeAllListeners();
       this.spawn.stdin.removeAllListeners();
       this.spawn.stdout.removeAllListeners();
-
+      this.ready = false;
+      if(this.restart) this.startServer();
     });
   }
 
@@ -96,7 +102,10 @@ class MCSU extends EventEmitter {
     const time = new Date(timeStr);
     const type = infoArr[1].split("/")[1];
 
-    if(message.includes("For help, type \"help\"")) this.emit("ready");
+    if(message.includes("For help, type \"help\"")) {
+      this.ready = true;
+      this.emit("ready");
+    }
     if(this.regex.join.test(message)) {
       const username = message.split(" ")[0];
       this.lastOnline.set(username, "now");
